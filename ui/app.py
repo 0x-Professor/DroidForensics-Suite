@@ -473,19 +473,20 @@ def export_investigation():
     return "❌ No active case to export"
 
 
+# UI Theme and CSS
+UI_THEME = gr.themes.Soft(primary_hue="blue", secondary_hue="slate")
+UI_CSS = """
+.header { text-align: center; margin-bottom: 20px; }
+.status-box { padding: 15px; border-radius: 8px; }
+.connected { background-color: #d4edda; }
+.disconnected { background-color: #f8d7da; }
+"""
+
+
 def create_ui():
     """Create the Gradio web interface."""
     
-    with gr.Blocks(
-        title="FIA Android Forensics",
-        theme=gr.themes.Soft(primary_hue="blue", secondary_hue="slate"),
-        css="""
-        .header { text-align: center; margin-bottom: 20px; }
-        .status-box { padding: 15px; border-radius: 8px; }
-        .connected { background-color: #d4edda; }
-        .disconnected { background-color: #f8d7da; }
-        """
-    ) as app:
+    with gr.Blocks(title="FIA Android Forensics") as app:
         
         # Header
         gr.Markdown("""
