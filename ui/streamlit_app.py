@@ -296,153 +296,347 @@ class ADBExecutor:
         }
 
 
-# ========== AI INVESTIGATION PLANNER ==========
+# ========== INTELLIGENT FORENSIC AGENT ==========
 
-class InvestigationPlanner:
-    """AI-powered investigation planner using LangChain and Gemini."""
-    
-    AVAILABLE_COMMANDS = {
-        "device_info": "Get device identification and properties",
-        "installed_apps": "Get complete application inventory",
-        "logcat": "Extract system logs",
-        "contacts": "Extract contact database",
-        "call_log": "Extract call history records",
-        "sms": "Extract text messages",
-        "battery": "Get battery status",
-        "storage": "Get storage partition information",
-        "network": "Get network configuration",
-        "processes": "Get active process list",
-        "images": "List and extract images from device",
-        "adb_shell": "Execute custom ADB shell command"
-    }
+class ForensicAgent:
+    """
+    Intelligent AI-powered forensic agent that can:
+    1. Understand any data extraction request and generate appropriate ADB commands
+    2. Analyze collected artifacts and provide insights
+    3. Handle errors gracefully with helpful suggestions
+    4. Create multi-step investigation plans
+    """
     
     _last_error = None
     
+    # Common ADB commands for reference
+    ADB_COMMAND_KNOWLEDGE = """
+Common ADB commands for forensic data extraction:
+- adb shell content query --uri content://sms/ : SMS messages
+- adb shell content query --uri content://call_log/calls/ : Call logs
+- adb shell content query --uri content://contacts/phones/ : Contacts
+- adb shell content query --uri content://media/external/images/media : Image metadata
+- adb shell content query --uri content://media/external/video/media : Video metadata
+- adb shell content query --uri content://media/external/audio/media : Audio metadata
+- adb shell content query --uri content://browser/bookmarks : Browser bookmarks
+- adb shell content query --uri content://calendar/events : Calendar events
+- adb shell dumpsys battery : Battery info
+- adb shell dumpsys connectivity : Network info
+- adb shell dumpsys package [package] : App info
+- adb shell dumpsys activity : Activity info
+- adb shell dumpsys location : Location services
+- adb shell dumpsys notification : Notifications
+- adb shell pm list packages : List packages
+- adb shell ps -A : Running processes
+- adb shell logcat -d : System logs
+- adb shell getprop : All system properties
+- adb shell ls [path] : List files
+- adb shell cat [file] : Read file content
+- adb shell find [path] -name [pattern] : Find files
+- adb pull [remote] [local] : Pull file from device
+- adb shell settings list system : System settings
+- adb shell settings list secure : Secure settings
+- adb shell settings list global : Global settings
+- adb shell dumpsys wifi : WiFi information
+- adb shell dumpsys bluetooth_manager : Bluetooth info
+- adb shell dumpsys account : Account information
+- adb shell content query --uri content://com.android.externalstorage.documents : External storage
+"""
+    
     @staticmethod
     def is_available() -> bool:
-        """Check if AI planning is available."""
+        """Check if AI agent is available."""
         return AI_AVAILABLE and bool(os.getenv("GEMINI_API_KEY"))
     
     @staticmethod
     def get_last_error() -> Optional[str]:
-        """Get the last error message."""
-        return InvestigationPlanner._last_error
+        return ForensicAgent._last_error
     
     @staticmethod
-    def create_investigation_plan(user_request: str) -> Optional[Dict]:
+    def _get_llm():
+        """Get configured LLM instance."""
+        return ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            google_api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=0.2,
+            max_retries=2
+        )
+    
+    @staticmethod
+    def analyze_request(user_input: str, artifacts: Dict = None) -> Dict:
         """
-        Analyze user request and create an investigation plan.
-        Returns a plan with steps to execute.
+        Analyze user request and determine the best action.
+        Returns: {"action": "extract|analyze|search|plan|help", "details": {...}}
         """
-        InvestigationPlanner._last_error = None
+        ForensicAgent._last_error = None
         
-        if not AI_AVAILABLE:
-            InvestigationPlanner._last_error = "LangChain not installed. Run: pip install langchain-google-genai"
-            return None
-        
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            InvestigationPlanner._last_error = "GEMINI_API_KEY not found in .env file"
-            return None
+        if not ForensicAgent.is_available():
+            return {"action": "error", "message": "AI not available. Set GEMINI_API_KEY in .env"}
         
         try:
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=api_key,
-                temperature=0.1,
-                max_retries=2
-            )
+            llm = ForensicAgent._get_llm()
             
-            system_prompt = f"""You are an expert Android forensics investigator assistant. 
-Your task is to analyze user investigation requests and create structured execution plans.
+            artifacts_summary = ""
+            if artifacts:
+                artifacts_summary = f"\n\nCurrently collected artifacts:\n"
+                for name, data in artifacts.items():
+                    artifacts_summary += f"- {name} (type: {data.get('type', 'unknown')}, collected: {data.get('collected_at', 'unknown')})\n"
+            
+            system_prompt = f"""You are an expert Android forensic investigator AI agent. Analyze the user's request and determine the best action.
 
-Available forensic commands:
-{json.dumps(InvestigationPlanner.AVAILABLE_COMMANDS, indent=2)}
+{ForensicAgent.ADB_COMMAND_KNOWLEDGE}
+{artifacts_summary}
 
-For ADB shell commands, you can use "adb_shell:<command>" format.
+Analyze the request and respond with ONLY a JSON object (no markdown):
 
-IMPORTANT: You MUST respond with ONLY a valid JSON object. No markdown code blocks. No explanations before or after.
+For DATA EXTRACTION requests (user wants to get data from device):
+{{"action": "extract", "adb_command": "the exact adb command to run", "description": "what this will retrieve", "data_type": "type of data"}}
 
-JSON format:
-{{"plan_title": "Brief title", "analysis": "What user wants", "steps": [{{"step_number": 1, "command": "command_name", "description": "What this does", "rationale": "Why needed"}}], "warnings": ["Legal warnings"], "estimated_time": "Time estimate"}}
+For ARTIFACT ANALYSIS requests (user asking about collected data, its importance, or how to find specific info):
+{{"action": "analyze", "artifact_names": ["list of relevant artifacts"], "analysis_type": "importance|search|explain|compare", "query": "what to analyze"}}
 
-If the request is too simple (single command), respond with just: null
+For WEB SEARCH requests (user asking how to do something, forensic procedures, or needs external info):
+{{"action": "search", "query": "search query for forensic guidance"}}
 
-ALWAYS create a multi-step plan for investigation requests. Be comprehensive."""
+For MULTI-STEP INVESTIGATION requests (complex investigation requiring multiple steps):
+{{"action": "plan", "plan_title": "title", "steps": [{{"step": 1, "adb_command": "command", "description": "what it does"}}]}}
+
+For UNCLEAR requests or needing more info:
+{{"action": "help", "message": "helpful message explaining available options"}}
+
+Be smart about interpreting user intent. "fetch images" means extract images, "what's important in call logs" means analyze artifacts."""
 
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=f"Create an investigation plan for: {user_request}")
+                HumanMessage(content=f"User request: {user_input}")
             ]
             
             response = llm.invoke(messages)
             content = response.content.strip()
             
-            # Clean up the response - remove markdown if present
+            # Clean JSON from markdown
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0]
             elif "```" in content:
-                parts = content.split("```")
-                if len(parts) >= 2:
-                    content = parts[1]
+                content = content.split("```")[1].split("```")[0]
             content = content.strip()
             
-            if content.lower() == "null" or not content:
-                InvestigationPlanner._last_error = "AI returned null - request may be too simple"
-                return None
-            
-            plan = json.loads(content)
-            
-            if plan and "steps" in plan and len(plan.get("steps", [])) >= 1:
-                return plan
-            else:
-                InvestigationPlanner._last_error = "Plan has no steps"
-                return None
+            return json.loads(content)
             
         except json.JSONDecodeError as e:
-            InvestigationPlanner._last_error = f"Failed to parse AI response as JSON: {str(e)}"
-            return None
+            ForensicAgent._last_error = f"Failed to parse AI response: {str(e)}"
+            return {"action": "error", "message": "AI response parsing error. Please try rephrasing your request."}
         except Exception as e:
             error_msg = str(e)
             if "429" in error_msg or "quota" in error_msg.lower():
-                InvestigationPlanner._last_error = "API quota exceeded. Please wait a moment and try again."
-            else:
-                InvestigationPlanner._last_error = f"AI Error: {error_msg[:200]}"
-            return None
+                ForensicAgent._last_error = "API quota exceeded"
+                return {"action": "error", "message": "API quota exceeded. Please wait a moment or use direct commands like 'device info', 'sms', 'call log'."}
+            ForensicAgent._last_error = error_msg
+            return {"action": "error", "message": f"AI Error: {error_msg[:150]}"}
     
     @staticmethod
-    def execute_plan_step(step: Dict) -> str:
-        """Execute a single step from the plan."""
-        command = step.get("command", "")
+    def execute_extraction(adb_command: str, description: str = "", data_type: str = "") -> str:
+        """Execute an ADB command and return formatted results with error handling."""
+        try:
+            result = ADBExecutor.run_command(adb_command, timeout=60)
+            
+            if result["success"]:
+                output = result.get("stdout", "")
+                if output and output.strip():
+                    # Store as artifact
+                    artifact_name = data_type or f"extraction_{datetime.now().strftime('%H%M%S')}"
+                    add_artifact(artifact_name, output[:10000], data_type or "extracted_data")
+                    
+                    return f"""## DATA EXTRACTION SUCCESSFUL
+
+**Command:** `{adb_command}`
+**Description:** {description}
+**Data Type:** {data_type}
+
+**Results:**
+```
+{output[:8000]}
+```
+
+{"*Output truncated (showing first 8000 characters)*" if len(output) > 8000 else ""}
+
+*Data saved to artifacts as '{artifact_name}'*"""
+                else:
+                    return f"""## NO DATA RETURNED
+
+**Command:** `{adb_command}`
+
+The command executed successfully but returned no data. This could mean:
+- The requested data doesn't exist on this device
+- The app/feature hasn't been used
+- Permission restrictions are in place
+
+**Suggestions:**
+- Check if the device has the relevant app installed
+- Verify USB debugging permissions
+- Try running: `adb shell pm list packages` to see available apps"""
+            else:
+                error = result.get("error") or result.get("stderr", "Unknown error")
+                return ForensicAgent._format_error(adb_command, error)
+                
+        except Exception as e:
+            return ForensicAgent._format_error(adb_command, str(e))
+    
+    @staticmethod
+    def _format_error(command: str, error: str) -> str:
+        """Format error messages with helpful suggestions."""
+        suggestions = []
         
-        # Map plan commands to actual execution
-        command_map = {
-            "device_info": "device info",
-            "installed_apps": "installed apps",
-            "logcat": "logcat",
-            "contacts": "contacts",
-            "call_log": "call log",
-            "sms": "sms",
-            "battery": "battery",
-            "storage": "storage",
-            "network": "network",
-            "processes": "processes",
-            "images": "images"
-        }
-        
-        if command in command_map:
-            return process_command(command_map[command])
-        elif command.startswith("adb_shell:"):
-            adb_cmd = command[10:]
-            return process_command(f"adb shell {adb_cmd}")
+        if "permission" in error.lower() or "denied" in error.lower():
+            suggestions = [
+                "Ensure USB debugging is enabled on the device",
+                "Check if the device is properly authorized",
+                "Some data requires root access or special permissions",
+                "Try: `adb shell pm grant [package] [permission]`"
+            ]
+        elif "not found" in error.lower():
+            suggestions = [
+                "The requested path or content provider may not exist",
+                "Check if the relevant app is installed",
+                "Try listing available content with: `adb shell content query --uri content://`"
+            ]
+        elif "timeout" in error.lower():
+            suggestions = [
+                "The command took too long to execute",
+                "Device may be slow or busy",
+                "Try a simpler command first"
+            ]
+        elif "device" in error.lower() and ("not" in error.lower() or "offline" in error.lower()):
+            suggestions = [
+                "Reconnect the USB cable",
+                "Run: `adb kill-server` then `adb start-server`",
+                "Check if USB debugging is still enabled"
+            ]
         else:
-            return f"Unknown command: {command}"
+            suggestions = [
+                "Verify the device is connected: `adb devices`",
+                "Check USB debugging status",
+                "Try a basic command first: `device info`"
+            ]
+        
+        return f"""## COMMAND ERROR
+
+**Command:** `{command}`
+
+**Error:**
+```
+{error[:500]}
+```
+
+**Troubleshooting Suggestions:**
+{chr(10).join(f"- {s}" for s in suggestions)}"""
+    
+    @staticmethod
+    def analyze_artifacts(artifacts: Dict, artifact_names: List[str], analysis_type: str, query: str) -> str:
+        """Analyze collected artifacts and provide insights."""
+        if not artifacts:
+            return """## NO ARTIFACTS COLLECTED
+
+No data has been collected yet. Use data extraction commands first:
+- `device info` - Get device information
+- `sms` - Extract SMS messages
+- `call log` - Extract call history
+- `contacts` - Extract contacts
+- `installed apps` - List installed applications
+
+Or describe what data you need: "fetch all images from the device" """
+        
+        # Filter relevant artifacts
+        relevant_data = {}
+        if artifact_names and artifact_names[0] != "all":
+            for name in artifact_names:
+                for art_name, art_data in artifacts.items():
+                    if name.lower() in art_name.lower():
+                        relevant_data[art_name] = art_data
+        else:
+            relevant_data = artifacts
+        
+        if not relevant_data:
+            available = ", ".join(artifacts.keys())
+            return f"""## ARTIFACT NOT FOUND
+
+The requested artifact(s) were not found. 
+
+**Available artifacts:** {available}
+
+Please specify one of the available artifacts or collect new data."""
+        
+        # Use AI to analyze
+        if ForensicAgent.is_available():
+            try:
+                llm = ForensicAgent._get_llm()
+                
+                # Prepare artifact summaries
+                artifact_summary = ""
+                for name, data in relevant_data.items():
+                    content = str(data.get("data", ""))[:3000]
+                    artifact_summary += f"\n\n=== {name} (type: {data.get('type')}) ===\n{content}"
+                
+                analysis_prompts = {
+                    "importance": "Explain the forensic importance and evidentiary value of this data. What can investigators learn from it? What legal considerations apply?",
+                    "search": f"Search through this data to find: {query}. Extract relevant entries and explain their significance.",
+                    "explain": f"Explain what this data means and how to interpret it for forensic purposes. Answer: {query}",
+                    "compare": "Compare and correlate these artifacts. What patterns or connections can you identify?"
+                }
+                
+                prompt = analysis_prompts.get(analysis_type, f"Analyze this data and answer: {query}")
+                
+                messages = [
+                    SystemMessage(content="""You are an expert forensic analyst. Analyze the provided device artifacts professionally.
+Provide actionable insights for law enforcement. Be specific about what the data reveals.
+Format your response with clear sections. Do not use emojis."""),
+                    HumanMessage(content=f"{prompt}\n\nArtifacts:{artifact_summary}")
+                ]
+                
+                response = llm.invoke(messages)
+                
+                return f"""## ARTIFACT ANALYSIS
+
+**Analyzed:** {', '.join(relevant_data.keys())}
+**Analysis Type:** {analysis_type}
+
+{response.content}"""
+                
+            except Exception as e:
+                if "429" in str(e):
+                    return "## API QUOTA EXCEEDED\n\nPlease wait a moment before requesting AI analysis."
+                return f"## ANALYSIS ERROR\n\n{str(e)[:200]}"
+        
+        # Fallback without AI
+        return f"""## ARTIFACT SUMMARY
+
+**Available Data:**
+{chr(10).join(f"- **{name}**: {data.get('type', 'unknown')} (collected: {data.get('collected_at', 'unknown')})" for name, data in relevant_data.items())}
+
+*AI analysis unavailable. Configure GEMINI_API_KEY for intelligent insights.*"""
+    
+    @staticmethod
+    def create_and_display_plan(plan_data: Dict) -> str:
+        """Format and display an investigation plan."""
+        plan_display = f"""## INVESTIGATION PLAN
+
+**{plan_data.get('plan_title', 'Investigation Plan')}**
+
+### Proposed Steps:
+
+| Step | Command | Description |
+|------|---------|-------------|
+"""
+        for step in plan_data.get("steps", []):
+            plan_display += f"| {step.get('step', '')} | `{step.get('adb_command', '')}` | {step.get('description', '')} |\n"
+        
+        plan_display += "\n**Use the 'Execute Plan' button in the sidebar to proceed, or enter a new command to cancel.**"
+        
+        return plan_display
 
 
 def search_web_tavily(query: str) -> str:
-    """
-    Search for forensic investigation guidance using Tavily API.
-    """
+    """Search for forensic investigation guidance using Tavily API."""
     tavily_key = os.getenv("TAVILY_API_KEY")
     
     if TAVILY_AVAILABLE and tavily_key:
@@ -454,116 +648,50 @@ def search_web_tavily(query: str) -> str:
                 max_results=5
             )
             
-            results = []
-            results.append("## WEB SEARCH RESULTS\n")
+            results = ["## WEB SEARCH RESULTS\n"]
             
             for i, result in enumerate(response.get("results", [])[:5], 1):
                 title = result.get("title", "No title")
-                content = result.get("content", "No content")[:300]
+                content = result.get("content", "No content")[:400]
                 url = result.get("url", "")
                 
                 results.append(f"### {i}. {title}\n")
                 results.append(f"{content}...\n")
                 if url:
-                    results.append(f"Source: {url}\n")
-                results.append("")
+                    results.append(f"*Source: {url}*\n")
             
-            if results:
-                return "\n".join(results)
-            else:
-                return "No results found for your query."
+            return "\n".join(results) if len(results) > 1 else "No results found."
                 
         except Exception as e:
-            return f"Tavily search error: {str(e)}"
+            return f"## SEARCH ERROR\n\nTavily search failed: {str(e)}\n\nTry rephrasing your question."
     
-    # Fallback to DuckDuckGo if Tavily not available
     return search_web_duckduckgo(query)
 
 
 def search_web_duckduckgo(query: str) -> str:
-    """
-    Fallback search using DuckDuckGo Instant Answer API.
-    """
+    """Fallback search using DuckDuckGo."""
     if not WEB_SEARCH_AVAILABLE:
-        return "Web search not available - install requests: pip install requests"
+        return "Web search not available - install requests: `pip install requests`"
     
     try:
-        search_url = "https://api.duckduckgo.com/"
-        params = {
-            "q": f"android forensics {query}",
-            "format": "json",
-            "no_html": 1,
-            "skip_disambig": 1
-        }
-        
-        response = requests.get(search_url, params=params, timeout=10)
+        response = requests.get(
+            "https://api.duckduckgo.com/",
+            params={"q": f"android forensics {query}", "format": "json", "no_html": 1},
+            timeout=10
+        )
         data = response.json()
         
         results = []
-        
         if data.get("Abstract"):
             results.append(f"**Summary:** {data['Abstract']}")
-            if data.get("AbstractURL"):
-                results.append(f"Source: {data['AbstractURL']}")
-        
         if data.get("RelatedTopics"):
-            results.append("\n**Related Information:**")
             for topic in data["RelatedTopics"][:5]:
                 if isinstance(topic, dict) and topic.get("Text"):
                     results.append(f"- {topic['Text'][:200]}")
         
-        if results:
-            return "\n".join(results)
-        else:
-            return "No specific guidance found. Consider consulting official Android forensics documentation."
-            
+        return "\n".join(results) if results else "No specific guidance found."
     except Exception as e:
         return f"Search error: {str(e)}"
-
-
-def search_web_for_guidance(query: str) -> str:
-    """Main web search function - uses Tavily if available, otherwise DuckDuckGo."""
-    return search_web_tavily(query)
-
-
-def get_ai_response(user_input: str) -> str:
-    """Get AI response for general investigation questions."""
-    if not AI_AVAILABLE:
-        return "AI features require langchain-google-genai. Install with: pip install langchain-google-genai"
-    
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return "GEMINI_API_KEY not configured in .env file"
-    
-    try:
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
-            google_api_key=api_key,
-            temperature=0.3,
-            max_retries=2
-        )
-        
-        system_prompt = """You are an expert Android forensics investigator assistant for law enforcement.
-Provide professional, accurate, and legally sound guidance for digital forensic investigations.
-Keep responses concise and actionable. Reference proper forensic procedures and chain of custody requirements.
-Do not include emojis or casual language. Maintain a professional law enforcement tone.
-
-If the user asks about extracting data, mention the available commands:
-- device info, installed apps, logcat, contacts, call log, sms, battery, storage, network, processes, images
-- Direct ADB commands: adb shell [command], adb pull [path]"""
-        
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_input)
-        ]
-        
-        response = llm.invoke(messages)
-        return response.content
-    except Exception as e:
-        error_msg = str(e)
-        if "429" in error_msg or "quota" in error_msg.lower():
-            return "API quota exceeded. Please wait a moment and try again, or use direct commands."
-        return f"AI Error: {error_msg[:200]}"
 
 
 def check_device_connection() -> Dict:
@@ -625,137 +753,161 @@ def add_artifact(name: str, data: Any, artifact_type: str = "text"):
 
 
 def process_command(user_input: str) -> str:
-    """Process user command."""
+    """
+    Process user command using the intelligent ForensicAgent.
+    Handles data extraction, artifact analysis, web search, and investigation planning.
+    """
     if not user_input.strip():
         return "Please enter a command or query."
     
     add_audit_log(f"Command: {user_input[:80]}", "INFO", "USER_INPUT")
     
-    # Direct ADB command
+    # Direct ADB command - execute immediately
     if user_input.strip().lower().startswith("adb "):
-        result = ADBExecutor.run_command(user_input.strip())
-        if result["success"]:
-            output = result["stdout"] or "Command executed successfully"
-            add_artifact(f"cmd_{datetime.now().strftime('%H%M%S')}", output, "command_output")
-            return f"**Command:** `{user_input}`\n\n**Output:**\n```\n{output[:5000]}\n```"
-        else:
-            error = result.get("error") or result.get("stderr", "Unknown error")
-            return f"**Command:** `{user_input}`\n\n**Error:**\n```\n{error}\n```"
+        return ForensicAgent.execute_extraction(
+            user_input.strip(), 
+            "Direct ADB command", 
+            "adb_output"
+        )
     
     lower_input = user_input.lower()
     
-    if any(k in lower_input for k in ["device info", "device information", "identify device"]):
-        info = ADBExecutor.get_device_info()
-        add_artifact("device_info", info, "device")
-        return format_device_info(info)
+    # Quick commands for common operations (fast path, no AI needed)
+    quick_commands = {
+        "device info": ("adb shell getprop", "Device properties", "device_info"),
+        "battery": ("adb shell dumpsys battery", "Battery status", "battery"),
+        "storage": ("adb shell df -h", "Storage information", "storage"),
+        "processes": ("adb shell ps -A", "Running processes", "processes"),
+    }
     
-    if any(k in lower_input for k in ["installed apps", "installed packages", "list apps", "applications"]):
+    for trigger, (cmd, desc, dtype) in quick_commands.items():
+        if trigger in lower_input and len(lower_input) < 30:
+            # Use existing methods for common commands
+            if "device info" in lower_input:
+                info = ADBExecutor.get_device_info()
+                add_artifact("device_info", info, "device")
+                return format_device_info(info)
+            elif "battery" in lower_input:
+                battery = ADBExecutor.get_battery_info() or "No battery data"
+                add_artifact("battery", battery, "system")
+                return f"## BATTERY STATUS\n\n```\n{battery}\n```"
+            elif "storage" in lower_input:
+                storage = ADBExecutor.get_storage_info() or "No storage data"
+                add_artifact("storage", storage, "system")
+                return f"## STORAGE INFORMATION\n\n```\n{storage}\n```"
+            elif "processes" in lower_input:
+                procs = ADBExecutor.get_running_processes() or "No process data"
+                add_artifact("processes", procs, "system")
+                return f"## RUNNING PROCESSES\n\n```\n{str(procs)[:8000]}\n```"
+    
+    # Other quick commands
+    if any(k in lower_input for k in ["installed apps", "list apps", "applications", "packages"]):
         packages = ADBExecutor.get_installed_packages()
         add_artifact("installed_packages", packages, "packages")
         return format_packages(packages)
     
-    if any(k in lower_input for k in ["logcat", "system log", "logs"]):
-        logs = ADBExecutor.get_logcat(200) or "No log data retrieved"
+    if any(k in lower_input for k in ["logcat", "system log"]) and "log" in lower_input:
+        logs = ADBExecutor.get_logcat(200) or "No log data"
         add_artifact("logcat", logs, "logs")
         return f"## SYSTEM LOGS\n\n```\n{str(logs)[:8000]}\n```"
     
     if any(k in lower_input for k in ["contacts", "address book"]):
-        contacts = ADBExecutor.get_contacts() or "No contacts data retrieved"
+        contacts = ADBExecutor.get_contacts() or "No contacts data"
         add_artifact("contacts", contacts, "contacts")
         return f"## CONTACTS DATABASE\n\n```\n{str(contacts)[:5000]}\n```"
     
-    if any(k in lower_input for k in ["call log", "call history", "calls"]):
-        calls = ADBExecutor.get_call_log() or "No call log data retrieved"
+    if any(k in lower_input for k in ["call log", "call history", "calls"]) and "call" in lower_input:
+        calls = ADBExecutor.get_call_log() or "No call log data"
         add_artifact("call_log", calls, "calls")
         return f"## CALL RECORDS\n\n```\n{str(calls)[:5000]}\n```"
     
-    if any(k in lower_input for k in ["sms", "messages", "text messages"]):
-        sms = ADBExecutor.get_sms() or "No SMS data retrieved"
+    if "sms" in lower_input or "text message" in lower_input:
+        sms = ADBExecutor.get_sms() or "No SMS data"
         add_artifact("sms", sms, "messages")
         return f"## SMS MESSAGES\n\n```\n{str(sms)[:5000]}\n```"
     
-    if any(k in lower_input for k in ["battery", "power"]):
-        battery = ADBExecutor.get_battery_info()
-        add_artifact("battery", battery, "system")
-        return f"## BATTERY STATUS\n\n```\n{battery}\n```"
-    
-    if any(k in lower_input for k in ["storage", "disk"]):
-        storage = ADBExecutor.get_storage_info()
-        add_artifact("storage", storage, "system")
-        return f"## STORAGE INFORMATION\n\n```\n{storage}\n```"
-    
     if any(k in lower_input for k in ["network", "wifi", "connectivity"]):
-        network = ADBExecutor.get_network_info() or "No network data retrieved"
+        network = ADBExecutor.get_network_info() or "No network data"
         add_artifact("network", str(network)[:3000], "system")
         return f"## NETWORK CONFIGURATION\n\n```\n{str(network)[:5000]}\n```"
     
-    if any(k in lower_input for k in ["processes", "running apps"]):
-        procs = ADBExecutor.get_running_processes() or "No process data retrieved"
-        add_artifact("processes", procs, "system")
-        return f"## RUNNING PROCESSES\n\n```\n{str(procs)[:8000]}\n```"
+    # Help command
+    if lower_input in ["help", "?", "commands", "what can you do"]:
+        return get_help_message()
     
-    # Image extraction
-    if any(k in lower_input for k in ["images", "photos", "pictures", "dcim", "gallery"]):
-        if any(k in lower_input for k in ["pull", "extract", "download", "fetch", "get"]):
-            result = ADBExecutor.pull_images()
-            add_artifact("images", result, "media")
-            if result["success"]:
-                return f"## IMAGES EXTRACTED\n\n**Destination:** `{result['dest_folder']}`\n\n**Pulled:**\n" + "\n".join(f"- {p}" for p in result['pulled'])
+    # ========== INTELLIGENT AGENT PROCESSING ==========
+    # For any other request, use the AI agent to understand and respond
+    
+    if ForensicAgent.is_available():
+        # Get current artifacts for context
+        artifacts = st.session_state.get("artifacts", {})
+        
+        # Analyze the request
+        analysis = ForensicAgent.analyze_request(user_input, artifacts)
+        action = analysis.get("action", "help")
+        
+        if action == "extract":
+            # AI determined this is a data extraction request
+            adb_command = analysis.get("adb_command", "")
+            description = analysis.get("description", "Data extraction")
+            data_type = analysis.get("data_type", "extracted_data")
+            
+            if adb_command:
+                return ForensicAgent.execute_extraction(adb_command, description, data_type)
             else:
-                return f"## IMAGE EXTRACTION\n\n**Errors:**\n" + "\n".join(f"- {e}" for e in result['errors'])
-        else:
-            images = ADBExecutor.get_images_list()
-            add_artifact("images_list", images, "media")
-            return f"## DEVICE IMAGES\n\n```\n{images}\n```\n\n**Tip:** Use 'fetch images' or 'extract images' to download them to your computer."
-    
-    # Web search for forensic guidance
-    if any(k in lower_input for k in ["search", "how to", "guide", "procedure", "technique", "what is", "explain"]):
-        search_results = search_web_for_guidance(user_input)
-        return search_results
-    
-    # Check if this is a complex investigation request that needs planning
-    if InvestigationPlanner.is_available():
-        plan = InvestigationPlanner.create_investigation_plan(user_input)
-        if plan:
-            # Store the plan in session state for approval
-            st.session_state.pending_plan = plan
+                return "## EXTRACTION ERROR\n\nCould not determine the appropriate command. Please be more specific or use a direct ADB command."
+        
+        elif action == "analyze":
+            # AI determined this is an artifact analysis request
+            artifact_names = analysis.get("artifact_names", ["all"])
+            analysis_type = analysis.get("analysis_type", "explain")
+            query = analysis.get("query", user_input)
+            
+            return ForensicAgent.analyze_artifacts(artifacts, artifact_names, analysis_type, query)
+        
+        elif action == "search":
+            # AI determined this needs web search
+            search_query = analysis.get("query", user_input)
+            return search_web_tavily(search_query)
+        
+        elif action == "plan":
+            # AI created a multi-step investigation plan
+            st.session_state.pending_plan = analysis
             st.session_state.pending_plan_request = user_input
-            
-            # Format the plan for display
-            plan_display = f"## INVESTIGATION PLAN\n\n"
-            plan_display += f"**{plan.get('plan_title', 'Investigation Plan')}**\n\n"
-            plan_display += f"**Analysis:** {plan.get('analysis', '')}\n\n"
-            plan_display += f"**Estimated Time:** {plan.get('estimated_time', 'Unknown')}\n\n"
-            
-            if plan.get('warnings'):
-                plan_display += "**Warnings:**\n"
-                for warning in plan['warnings']:
-                    plan_display += f"- {warning}\n"
-                plan_display += "\n"
-            
-            plan_display += "### Proposed Steps:\n\n"
-            plan_display += "| Step | Command | Description | Rationale |\n"
-            plan_display += "|------|---------|-------------|------------|\n"
-            
-            for step in plan.get('steps', []):
-                plan_display += f"| {step.get('step_number', '')} | `{step.get('command', '')}` | {step.get('description', '')} | {step.get('rationale', '')} |\n"
-            
-            plan_display += "\n**Use the 'Execute Plan' button in the sidebar to proceed with this investigation, or type a new command to cancel.**"
-            
-            return plan_display
+            return ForensicAgent.create_and_display_plan(analysis)
+        
+        elif action == "error":
+            error_msg = analysis.get("message", "An error occurred")
+            return f"## AGENT ERROR\n\n{error_msg}\n\n**Available quick commands:** device info, sms, call log, contacts, installed apps, logcat, battery, storage, network, processes"
+        
         else:
-            # Show error if AI planning failed
-            error = InvestigationPlanner.get_last_error()
-            if error:
-                # Fall through to AI response
-                pass
+            # Help or unknown action
+            return analysis.get("message", get_help_message())
     
-    # Try AI response for general questions
-    ai_response = get_ai_response(user_input)
-    if ai_response:
-        return f"## AI ANALYSIS\n\n{ai_response}"
-    
-    return get_help_message()
+    else:
+        # AI not available - provide helpful message
+        return f"""## AI AGENT UNAVAILABLE
+
+The intelligent agent requires configuration. Please ensure:
+1. **GEMINI_API_KEY** is set in your `.env` file
+2. Install: `pip install langchain-google-genai`
+
+**Available Quick Commands (no AI required):**
+- `device info` - Device identification
+- `installed apps` - Application list
+- `sms` - SMS messages
+- `call log` - Call history
+- `contacts` - Contact database
+- `logcat` - System logs
+- `battery` - Battery status
+- `storage` - Storage info
+- `network` - Network config
+- `processes` - Running processes
+- `adb shell [command]` - Direct ADB command
+
+**Your request:** {user_input}
+
+Please use one of the quick commands above, or configure the AI agent for intelligent processing."""
 
 
 def format_device_info(info: Dict) -> str:
@@ -780,12 +932,14 @@ def format_packages(packages: List[Dict]) -> str:
 
 def get_help_message() -> str:
     """Return help message."""
-    ai_status = "ACTIVE" if InvestigationPlanner.is_available() else "INACTIVE"
+    ai_status = "ACTIVE" if ForensicAgent.is_available() else "INACTIVE"
     tavily_status = "ACTIVE" if TAVILY_AVAILABLE and os.getenv("TAVILY_API_KEY") else "INACTIVE"
     
-    return f"""## COMMAND REFERENCE
+    return f"""## INTELLIGENT FORENSIC AGENT
 
-### Data Acquisition Commands
+**AI Agent Status:** {ai_status} | **Web Search (Tavily):** {tavily_status}
+
+### Quick Commands (No AI Required)
 | Command | Description |
 |---------|-------------|
 | device info | Device identification and properties |
@@ -798,31 +952,35 @@ def get_help_message() -> str:
 | storage | Storage partition information |
 | network | Network configuration |
 | processes | Active process list |
-| images | List images on device |
-| fetch images | Extract all images to computer |
+| adb shell [cmd] | Execute any ADB command |
 
-### Direct ADB Commands
-| Command | Description |
-|---------|-------------|
-| adb shell [command] | Execute shell command |
-| adb pull [path] | Extract file from device |
+### AI-Powered Capabilities (When Active)
+The intelligent agent can understand natural language requests:
 
-### AI-Powered Features (Status: {ai_status})
-| Feature | Description |
-|---------|-------------|
-| Complex Investigation | Describe what you want to investigate and AI will create a step-by-step plan |
-| Web Search (Tavily: {tavily_status}) | Ask "how to", "what is", or "search" questions for guidance |
-| Evidence Analysis | Ask questions about findings for AI-powered analysis |
+**Data Extraction Examples:**
+- "Fetch all images from this device"
+- "Get the browser history"
+- "Extract WhatsApp databases"
+- "Pull all media files"
+- "Get calendar events"
 
-### Example Investigation Requests
+**Artifact Analysis Examples:**
+- "What's important in the call log data?"
+- "Find any suspicious numbers in the contacts"
+- "Analyze the SMS for evidence of fraud"
+- "Which artifacts are most valuable for this case?"
+
+**Investigation Planning Examples:**
 - "Investigate this device for evidence of financial fraud"
+- "Perform complete device triage"
 - "Collect all communication data for timeline analysis"
-- "Perform a complete device triage for drug trafficking investigation"
-- "Extract and analyze all user activity from the past 30 days"
-- "Fetch the images from this device"
-- "How to extract deleted messages from Android"
 
-**Note:** Complex investigation requests will generate a plan for your approval before execution.
+**Web Search Examples:**
+- "How to extract deleted messages from Android"
+- "What is SQLite database forensics"
+- "Search for mobile forensics best practices"
+
+**Note:** The agent will ask for your approval before executing multi-step investigation plans.
 """
 
 
@@ -1263,7 +1421,10 @@ def main():
                     
                     for step in plan.get("steps", []):
                         add_audit_log(f"Executing step {step.get('step_number')}: {step.get('command')}", "INFO", "PLAN_STEP")
-                        result = InvestigationPlanner.execute_plan_step(step)
+                        # Execute the step using ForensicAgent
+                        adb_cmd = step.get('adb_command', step.get('command', ''))
+                        description = step.get('description', step.get('command', ''))
+                        result = ForensicAgent.execute_extraction(adb_cmd, description, 'plan_step')
                         results.append({
                             "step": step.get("step_number"),
                             "command": step.get("command"),
@@ -1303,11 +1464,11 @@ def main():
         st.markdown("---")
         st.markdown('<div class="section-header">AI FEATURES</div>', unsafe_allow_html=True)
         
-        if InvestigationPlanner.is_available():
-            st.markdown('<span style="color: #276749; font-weight: bold;">AI PLANNING: ACTIVE</span>', unsafe_allow_html=True)
-            st.text("Enter complex investigation\nrequests for AI planning")
+        if ForensicAgent.is_available():
+            st.markdown('<span style="color: #276749; font-weight: bold;">🤖 FORENSIC AI: ACTIVE</span>', unsafe_allow_html=True)
+            st.text("Ask me anything about\nforensic data extraction\nor artifact analysis")
         else:
-            st.markdown('<span style="color: #c53030; font-weight: bold;">AI PLANNING: INACTIVE</span>', unsafe_allow_html=True)
+            st.markdown('<span style="color: #c53030; font-weight: bold;">AI: INACTIVE</span>', unsafe_allow_html=True)
             st.text("Set GEMINI_API_KEY in .env\nto enable AI features")
     
     # Main content area
