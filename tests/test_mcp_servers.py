@@ -292,15 +292,7 @@ class TestDeepAgentIntegration(unittest.TestCase):
             self.assertIn("system_prompt", subagent)
 
 
-class AsyncTestCase(unittest.TestCase):
-    """Base class for async tests."""
-    
-    def run_async(self, coro):
-        """Run an async coroutine."""
-        return asyncio.get_event_loop().run_until_complete(coro)
-
-
-class TestAsyncMCPOperations(AsyncTestCase):
+class TestAsyncMCPOperations(unittest.TestCase):
     """Test async MCP operations."""
     
     def test_async_tool_execution(self):
@@ -309,7 +301,7 @@ class TestAsyncMCPOperations(AsyncTestCase):
             await asyncio.sleep(0.01)
             return {"status": "success"}
         
-        result = self.run_async(mock_tool())
+        result = asyncio.run(mock_tool())
         self.assertEqual(result["status"], "success")
 
 
