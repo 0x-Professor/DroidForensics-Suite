@@ -108,7 +108,8 @@ class TestArtifactParserTools(unittest.TestCase):
     def test_sqlite_library_available(self):
         """Verify SQLite library is available."""
         import sqlite3
-        self.assertIsNotNone(sqlite3.version)
+        # Use sqlite_version instead of deprecated version attribute
+        self.assertIsNotNone(sqlite3.sqlite_version)
     
     def test_parse_mock_database(self):
         """Test database parsing with mock data."""
