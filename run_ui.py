@@ -9,7 +9,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from ui.app import launch_ui
+from ui.app import launch
 
 
 def main():
@@ -34,19 +34,15 @@ def main():
     args = parser.parse_args()
     
     print("""
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║     FIA Android Digital Forensics Framework                   ║
-    ║     Interactive Investigation Console                         ║
-    ╠═══════════════════════════════════════════════════════════════╣
-    ║  Features:                                                    ║
-    ║  • Device connection monitoring                               ║
-    ║  • Human-in-the-loop tool approval                            ║
-    ║  • AI-powered forensic analysis                               ║
-    ║  • Interactive investigation workflow                         ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ================================================================
+         FIA DIGITAL FORENSICS INVESTIGATION CONSOLE
+         Federal Investigation Agency
+    ----------------------------------------------------------------
+         Starting Investigation Console...
+    ================================================================
     """)
     
-    launch_ui(share=args.share, port=args.port)
+    launch(share=args.share, port=args.port)
 
 
 if __name__ == "__main__":
