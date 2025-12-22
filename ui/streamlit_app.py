@@ -616,7 +616,9 @@ def format_packages(packages: List[Dict]) -> str:
 
 def get_help_message() -> str:
     """Return help message."""
-    return """## COMMAND REFERENCE
+    ai_status = "ACTIVE" if InvestigationPlanner.is_available() else "INACTIVE"
+    
+    return f"""## COMMAND REFERENCE
 
 ### Data Acquisition Commands
 | Command | Description |
@@ -635,8 +637,23 @@ def get_help_message() -> str:
 ### Direct ADB Commands
 | Command | Description |
 |---------|-------------|
-| adb shell <command> | Execute shell command |
-| adb pull <path> | Extract file from device |
+| adb shell [command] | Execute shell command |
+| adb pull [path] | Extract file from device |
+
+### AI-Powered Features (Status: {ai_status})
+| Feature | Description |
+|---------|-------------|
+| Complex Investigation | Describe what you want to investigate and AI will create a step-by-step plan |
+| Search Guidance | Ask "how to" questions for forensic procedure guidance |
+| Evidence Analysis | Ask questions about findings for AI-powered analysis |
+
+### Example Complex Requests
+- "Investigate this device for evidence of financial fraud"
+- "Collect all communication data for timeline analysis"
+- "Perform a complete device triage for drug trafficking investigation"
+- "Extract and analyze all user activity from the past 30 days"
+
+**Note:** Complex investigation requests will generate a plan for your approval before execution.
 """
 
 
