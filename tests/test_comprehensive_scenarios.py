@@ -195,9 +195,9 @@ package:com.instagram.android"""
             for line in mock_run.return_value.stdout.split("\n")
         ]
         
-        # Filter for messaging apps
+        # Filter for messaging apps (whatsapp, telegram.messenger, facebook.orca)
         messaging = [p for p in packages if any(
-            x in p for x in ["whatsapp", "telegram", "messenger"]
+            x in p for x in ["whatsapp", "telegram", "orca"]
         )]
         
         self.assertEqual(len(messaging), 3)
@@ -411,15 +411,20 @@ class TestHardErrorRecovery(unittest.TestCase):
             f.write(b"NOT A VALID SQLITE DATABASE" + os.urandom(1000))
             db_path = f.name
         
+        conn = None
+        raised_error = False
         try:
-            try:
-                conn = sqlite3.connect(db_path)
-                conn.execute("SELECT * FROM messages")
-                self.fail("Should have raised an exception")
-            except sqlite3.DatabaseError as e:
-                self.assertIn("file is not a database", str(e).lower())
+            conn = sqlite3.connect(db_path)
+            conn.execute("SELECT * FROM messages")
+        except sqlite3.DatabaseError as e:
+            raised_error = True
+            self.assertIn("file is not a database", str(e).lower())
         finally:
+            if conn:
+                conn.close()
             os.unlink(db_path)
+        
+        self.assertTrue(raised_error, "Should have raised DatabaseError for corrupted file")
     
     def test_partial_data_extraction(self):
         """Test handling partial data when extraction is interrupted."""
