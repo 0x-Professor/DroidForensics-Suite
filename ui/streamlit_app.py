@@ -27,7 +27,14 @@ try:
 except ImportError:
     AI_AVAILABLE = False
 
-# Import for web search
+# Import Tavily for web search
+try:
+    from tavily import TavilyClient
+    TAVILY_AVAILABLE = True
+except ImportError:
+    TAVILY_AVAILABLE = False
+
+# Import for web search fallback
 try:
     import requests
     WEB_SEARCH_AVAILABLE = True
