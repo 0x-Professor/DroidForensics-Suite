@@ -550,6 +550,47 @@ def process_command(user_input: str) -> str:
         add_artifact("processes", procs, "system")
         return f"## RUNNING PROCESSES\n\n```\n{str(procs)[:8000]}\n```"
     
+    # Web search for forensic guidance
+    if any(k in lower_input for k in ["search", "how to", "guide", "procedure", "technique"]):
+        search_results = search_web_for_guidance(user_input)
+        return f"## FORENSIC GUIDANCE\n\n{search_results}"
+    
+    # Check if this is a complex investigation request that needs planning
+    if InvestigationPlanner.is_available():
+        plan = InvestigationPlanner.create_investigation_plan(user_input)
+        if plan:
+            # Store the plan in session state for approval
+            st.session_state.pending_plan = plan
+            st.session_state.pending_plan_request = user_input
+            
+            # Format the plan for display
+            plan_display = f"## INVESTIGATION PLAN\n\n"
+            plan_display += f"**{plan.get('plan_title', 'Investigation Plan')}**\n\n"
+            plan_display += f"**Analysis:** {plan.get('analysis', '')}\n\n"
+            plan_display += f"**Estimated Time:** {plan.get('estimated_time', 'Unknown')}\n\n"
+            
+            if plan.get('warnings'):
+                plan_display += "**Warnings:**\n"
+                for warning in plan['warnings']:
+                    plan_display += f"- {warning}\n"
+                plan_display += "\n"
+            
+            plan_display += "### Proposed Steps:\n\n"
+            plan_display += "| Step | Command | Description | Rationale |\n"
+            plan_display += "|------|---------|-------------|------------|\n"
+            
+            for step in plan.get('steps', []):
+                plan_display += f"| {step.get('step_number', '')} | `{step.get('command', '')}` | {step.get('description', '')} | {step.get('rationale', '')} |\n"
+            
+            plan_display += "\n**Use the 'Execute Plan' button in the sidebar to proceed with this investigation, or type a new command to cancel.**"
+            
+            return plan_display
+    
+    # Try AI response for general questions
+    ai_response = get_ai_response(user_input)
+    if ai_response:
+        return f"## AI ANALYSIS\n\n{ai_response}"
+    
     return get_help_message()
 
 
