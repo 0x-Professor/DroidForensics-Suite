@@ -19,6 +19,21 @@ import base64
 import streamlit as st
 from dotenv import load_dotenv
 
+# Import LangChain for AI features
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_core.messages import HumanMessage, SystemMessage
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+
+# Import for web search
+try:
+    import requests
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    WEB_SEARCH_AVAILABLE = False
+
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -303,24 +318,24 @@ def process_command(user_input: str) -> str:
         return format_packages(packages)
     
     if any(k in lower_input for k in ["logcat", "system log", "logs"]):
-        logs = ADBExecutor.get_logcat(200)
+        logs = ADBExecutor.get_logcat(200) or "No log data retrieved"
         add_artifact("logcat", logs, "logs")
-        return f"## SYSTEM LOGS\n\n```\n{logs[:8000]}\n```"
+        return f"## SYSTEM LOGS\n\n```\n{str(logs)[:8000]}\n```"
     
     if any(k in lower_input for k in ["contacts", "address book"]):
-        contacts = ADBExecutor.get_contacts()
+        contacts = ADBExecutor.get_contacts() or "No contacts data retrieved"
         add_artifact("contacts", contacts, "contacts")
-        return f"## CONTACTS DATABASE\n\n```\n{contacts[:5000]}\n```"
+        return f"## CONTACTS DATABASE\n\n```\n{str(contacts)[:5000]}\n```"
     
     if any(k in lower_input for k in ["call log", "call history", "calls"]):
-        calls = ADBExecutor.get_call_log()
+        calls = ADBExecutor.get_call_log() or "No call log data retrieved"
         add_artifact("call_log", calls, "calls")
-        return f"## CALL RECORDS\n\n```\n{calls[:5000]}\n```"
+        return f"## CALL RECORDS\n\n```\n{str(calls)[:5000]}\n```"
     
     if any(k in lower_input for k in ["sms", "messages", "text messages"]):
-        sms = ADBExecutor.get_sms()
+        sms = ADBExecutor.get_sms() or "No SMS data retrieved"
         add_artifact("sms", sms, "messages")
-        return f"## SMS MESSAGES\n\n```\n{sms[:5000]}\n```"
+        return f"## SMS MESSAGES\n\n```\n{str(sms)[:5000]}\n```"
     
     if any(k in lower_input for k in ["battery", "power"]):
         battery = ADBExecutor.get_battery_info()
@@ -333,14 +348,14 @@ def process_command(user_input: str) -> str:
         return f"## STORAGE INFORMATION\n\n```\n{storage}\n```"
     
     if any(k in lower_input for k in ["network", "wifi", "connectivity"]):
-        network = ADBExecutor.get_network_info()
-        add_artifact("network", network[:3000], "system")
-        return f"## NETWORK CONFIGURATION\n\n```\n{network[:5000]}\n```"
+        network = ADBExecutor.get_network_info() or "No network data retrieved"
+        add_artifact("network", str(network)[:3000], "system")
+        return f"## NETWORK CONFIGURATION\n\n```\n{str(network)[:5000]}\n```"
     
     if any(k in lower_input for k in ["processes", "running apps"]):
-        procs = ADBExecutor.get_running_processes()
+        procs = ADBExecutor.get_running_processes() or "No process data retrieved"
         add_artifact("processes", procs, "system")
-        return f"## RUNNING PROCESSES\n\n```\n{procs[:8000]}\n```"
+        return f"## RUNNING PROCESSES\n\n```\n{str(procs)[:8000]}\n```"
     
     return get_help_message()
 
