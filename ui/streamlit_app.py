@@ -229,6 +229,199 @@ class ADBExecutor:
         }
 
 
+# ========== AI INVESTIGATION PLANNER ==========
+
+class InvestigationPlanner:
+    """AI-powered investigation planner using LangChain and Gemini."""
+    
+    AVAILABLE_COMMANDS = {
+        "device_info": "Get device identification and properties",
+        "installed_apps": "Get complete application inventory",
+        "logcat": "Extract system logs",
+        "contacts": "Extract contact database",
+        "call_log": "Extract call history records",
+        "sms": "Extract text messages",
+        "battery": "Get battery status",
+        "storage": "Get storage partition information",
+        "network": "Get network configuration",
+        "processes": "Get active process list",
+        "adb_shell": "Execute custom ADB shell command"
+    }
+    
+    @staticmethod
+    def is_available() -> bool:
+        """Check if AI planning is available."""
+        return AI_AVAILABLE and os.getenv("GEMINI_API_KEY")
+    
+    @staticmethod
+    def create_investigation_plan(user_request: str) -> Optional[Dict]:
+        """
+        Analyze user request and create an investigation plan.
+        Returns a plan with steps to execute.
+        """
+        if not InvestigationPlanner.is_available():
+            return None
+        
+        try:
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash",
+                google_api_key=os.getenv("GEMINI_API_KEY"),
+                temperature=0.1
+            )
+            
+            system_prompt = f"""You are an expert Android forensics investigator assistant. 
+Your task is to analyze user investigation requests and create structured execution plans.
+
+Available forensic commands:
+{json.dumps(InvestigationPlanner.AVAILABLE_COMMANDS, indent=2)}
+
+For ADB shell commands, you can use "adb_shell:<command>" format.
+
+Respond ONLY with a valid JSON object (no markdown, no explanation) in this format:
+{{
+    "plan_title": "Brief title of the investigation",
+    "analysis": "Brief analysis of what the user wants to investigate",
+    "steps": [
+        {{
+            "step_number": 1,
+            "command": "command_name",
+            "description": "What this step will do",
+            "rationale": "Why this is needed for the investigation"
+        }}
+    ],
+    "warnings": ["Any legal or procedural warnings"],
+    "estimated_time": "Estimated completion time"
+}}
+
+If the request is a simple single command, return null.
+If the request requires multiple data acquisitions or analysis, create a comprehensive plan.
+Focus on forensically sound procedures that maintain chain of custody."""
+
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"User request: {user_request}")
+            ]
+            
+            response = llm.invoke(messages)
+            content = response.content.strip()
+            
+            # Clean up the response
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+            content = content.strip()
+            
+            if content.lower() == "null" or not content:
+                return None
+            
+            plan = json.loads(content)
+            return plan if plan and "steps" in plan and len(plan["steps"]) > 1 else None
+            
+        except Exception as e:
+            return None
+    
+    @staticmethod
+    def execute_plan_step(step: Dict) -> str:
+        """Execute a single step from the plan."""
+        command = step.get("command", "")
+        
+        # Map plan commands to actual execution
+        command_map = {
+            "device_info": "device info",
+            "installed_apps": "installed apps",
+            "logcat": "logcat",
+            "contacts": "contacts",
+            "call_log": "call log",
+            "sms": "sms",
+            "battery": "battery",
+            "storage": "storage",
+            "network": "network",
+            "processes": "processes"
+        }
+        
+        if command in command_map:
+            return process_command(command_map[command])
+        elif command.startswith("adb_shell:"):
+            adb_cmd = command[10:]
+            return process_command(f"adb shell {adb_cmd}")
+        else:
+            return f"Unknown command: {command}"
+
+
+def search_web_for_guidance(query: str) -> str:
+    """
+    Search for forensic investigation guidance.
+    Uses DuckDuckGo Instant Answer API for privacy.
+    """
+    if not WEB_SEARCH_AVAILABLE:
+        return "Web search not available - requests module not installed"
+    
+    try:
+        # Use DuckDuckGo Instant Answer API
+        search_url = "https://api.duckduckgo.com/"
+        params = {
+            "q": f"android forensics {query}",
+            "format": "json",
+            "no_html": 1,
+            "skip_disambig": 1
+        }
+        
+        response = requests.get(search_url, params=params, timeout=10)
+        data = response.json()
+        
+        results = []
+        
+        # Abstract (main answer)
+        if data.get("Abstract"):
+            results.append(f"**Summary:** {data['Abstract']}")
+            if data.get("AbstractURL"):
+                results.append(f"Source: {data['AbstractURL']}")
+        
+        # Related topics
+        if data.get("RelatedTopics"):
+            results.append("\n**Related Information:**")
+            for topic in data["RelatedTopics"][:5]:
+                if isinstance(topic, dict) and topic.get("Text"):
+                    results.append(f"- {topic['Text'][:200]}")
+        
+        if results:
+            return "\n".join(results)
+        else:
+            return "No specific guidance found. Consider consulting official Android forensics documentation or NIST guidelines."
+            
+    except Exception as e:
+        return f"Search error: {str(e)}"
+
+
+def get_ai_response(user_input: str) -> str:
+    """Get AI response for general investigation questions."""
+    if not AI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
+        return None
+    
+    try:
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            google_api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=0.3
+        )
+        
+        system_prompt = """You are an expert Android forensics investigator assistant for law enforcement.
+Provide professional, accurate, and legally sound guidance for digital forensic investigations.
+Keep responses concise and actionable. Reference proper forensic procedures and chain of custody requirements.
+Do not include emojis or casual language. Maintain a professional law enforcement tone."""
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_input)
+        ]
+        
+        response = llm.invoke(messages)
+        return response.content
+    except Exception as e:
+        return None
+
+
 def check_device_connection() -> Dict:
     """Check if device is connected."""
     try:
