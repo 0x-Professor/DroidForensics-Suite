@@ -1058,6 +1058,71 @@ def main():
                 st.success(f"Report saved: {filepath}")
             else:
                 st.error("No active case")
+        
+        # AI Investigation Plan Execution
+        if st.session_state.get("pending_plan"):
+            st.markdown("---")
+            st.markdown('<div class="section-header">PENDING INVESTIGATION PLAN</div>', unsafe_allow_html=True)
+            
+            plan = st.session_state.pending_plan
+            st.info(f"**{plan.get('plan_title', 'Investigation Plan')}**")
+            st.text(f"Steps: {len(plan.get('steps', []))}")
+            
+            col_exec, col_cancel = st.columns(2)
+            
+            with col_exec:
+                if st.button("Execute Plan", use_container_width=True, type="primary"):
+                    st.session_state.plan_executing = True
+                    results = []
+                    
+                    for step in plan.get("steps", []):
+                        add_audit_log(f"Executing step {step.get('step_number')}: {step.get('command')}", "INFO", "PLAN_STEP")
+                        result = InvestigationPlanner.execute_plan_step(step)
+                        results.append({
+                            "step": step.get("step_number"),
+                            "command": step.get("command"),
+                            "result": result
+                        })
+                    
+                    # Format results
+                    final_result = f"## INVESTIGATION PLAN EXECUTED\n\n"
+                    final_result += f"**{plan.get('plan_title', 'Investigation')}**\n\n"
+                    
+                    for r in results:
+                        final_result += f"### Step {r['step']}: {r['command']}\n\n"
+                        final_result += f"{r['result']}\n\n---\n\n"
+                    
+                    st.session_state.messages.append({
+                        "role": "user", 
+                        "content": f"[Investigation Plan] {st.session_state.get('pending_plan_request', 'Plan execution')}"
+                    })
+                    st.session_state.messages.append({"role": "assistant", "content": final_result})
+                    
+                    # Clear the pending plan
+                    st.session_state.pending_plan = None
+                    st.session_state.pending_plan_request = None
+                    st.session_state.plan_executing = False
+                    
+                    add_audit_log("Investigation plan completed", "INFO", "PLAN_COMPLETE")
+                    st.rerun()
+            
+            with col_cancel:
+                if st.button("Cancel Plan", use_container_width=True):
+                    st.session_state.pending_plan = None
+                    st.session_state.pending_plan_request = None
+                    add_audit_log("Investigation plan cancelled", "INFO", "PLAN_CANCELLED")
+                    st.rerun()
+        
+        # AI Status
+        st.markdown("---")
+        st.markdown('<div class="section-header">AI FEATURES</div>', unsafe_allow_html=True)
+        
+        if InvestigationPlanner.is_available():
+            st.markdown('<span style="color: #276749; font-weight: bold;">AI PLANNING: ACTIVE</span>', unsafe_allow_html=True)
+            st.text("Enter complex investigation\nrequests for AI planning")
+        else:
+            st.markdown('<span style="color: #c53030; font-weight: bold;">AI PLANNING: INACTIVE</span>', unsafe_allow_html=True)
+            st.text("Set GEMINI_API_KEY in .env\nto enable AI features")
     
     # Main content area
     col1, col2 = st.columns([2, 1])
