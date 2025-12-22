@@ -7,6 +7,7 @@ Features:
 - Human-in-the-loop tool approval
 - Interactive investigation workflow
 - Real-time logging and status updates
+- LangGraph-powered AI agent
 """
 
 import asyncio
@@ -21,6 +22,12 @@ from typing import Any, Generator, Optional
 
 import gradio as gr
 from dotenv import load_dotenv
+
+# Add parent to path for imports
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from agents.interactive_agent import InteractiveInvestigator, FORENSIC_TOOLS
 
 # Load environment
 load_dotenv()
