@@ -63,7 +63,9 @@ def check_adb_available() -> bool:
             ["adb", "version"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            encoding='utf-8',
+            errors='replace'
         )
         return result.returncode == 0
     except (subprocess.SubprocessError, FileNotFoundError):
@@ -79,7 +81,9 @@ def execute_adb_command(args: list[str], timeout: int = 30, input_data: Optional
             capture_output=True,
             text=True,
             timeout=timeout,
-            input=input_data
+            input=input_data,
+            encoding='utf-8',
+            errors='replace'
         )
         
         return {

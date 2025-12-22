@@ -57,7 +57,7 @@ def execute_adb_command(args: list[str], timeout: int = 30) -> dict[str, Any]:
     """Execute ADB command safely with timeout"""
     try:
         cmd = ["adb"] + args
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, encoding='utf-8', errors='replace')
         return {
             "stdout": result.stdout,
             "stderr": result.stderr,

@@ -95,7 +95,9 @@ class ADBExecutor:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=Path(__file__).parent.parent
+                cwd=Path(__file__).parent.parent,
+                encoding='utf-8',
+                errors='replace'
             )
             
             return {
@@ -226,7 +228,9 @@ class ADBExecutor:
             capture_output=True,
             text=True,
             timeout=120,
-            cwd=Path(__file__).parent.parent
+            cwd=Path(__file__).parent.parent,
+            encoding='utf-8',
+            errors='replace'
         )
         
         return {
@@ -280,7 +284,9 @@ class ADBExecutor:
                 capture_output=True,
                 text=True,
                 timeout=300,
-                cwd=Path(__file__).parent.parent
+                cwd=Path(__file__).parent.parent,
+                encoding='utf-8',
+                errors='replace'
             )
             if result.returncode == 0:
                 pulled.append(f"Pulled {loc}")
@@ -700,7 +706,8 @@ def check_device_connection() -> Dict:
         result = subprocess.run(
             [ADB_PATH, "devices", "-l"],
             capture_output=True, text=True, timeout=10,
-            cwd=Path(__file__).parent.parent
+            cwd=Path(__file__).parent.parent,
+            encoding='utf-8', errors='replace'
         )
         
         devices = []
