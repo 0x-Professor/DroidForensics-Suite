@@ -633,9 +633,7 @@ def create_interface():
     """Build professional investigation interface."""
     
     with gr.Blocks(
-        title="FIA Digital Forensics",
-        theme=PROFESSIONAL_THEME,
-        css=PROFESSIONAL_CSS
+        title="FIA Digital Forensics"
     ) as interface:
         
         # Header
@@ -715,8 +713,7 @@ def create_interface():
                 chat_display = gr.Chatbot(
                     height=380,
                     show_label=False,
-                    elem_classes="chat-container",
-                    bubble_full_width=False
+                    elem_classes="chat-container"
                 )
                 
                 with gr.Row():
