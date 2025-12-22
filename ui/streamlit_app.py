@@ -312,13 +312,21 @@ class InvestigationPlanner:
         "storage": "Get storage partition information",
         "network": "Get network configuration",
         "processes": "Get active process list",
+        "images": "List and extract images from device",
         "adb_shell": "Execute custom ADB shell command"
     }
+    
+    _last_error = None
     
     @staticmethod
     def is_available() -> bool:
         """Check if AI planning is available."""
-        return AI_AVAILABLE and os.getenv("GEMINI_API_KEY")
+        return AI_AVAILABLE and bool(os.getenv("GEMINI_API_KEY"))
+    
+    @staticmethod
+    def get_last_error() -> Optional[str]:
+        """Get the last error message."""
+        return InvestigationPlanner._last_error
     
     @staticmethod
     def create_investigation_plan(user_request: str) -> Optional[Dict]:
@@ -326,14 +334,23 @@ class InvestigationPlanner:
         Analyze user request and create an investigation plan.
         Returns a plan with steps to execute.
         """
-        if not InvestigationPlanner.is_available():
+        InvestigationPlanner._last_error = None
+        
+        if not AI_AVAILABLE:
+            InvestigationPlanner._last_error = "LangChain not installed. Run: pip install langchain-google-genai"
+            return None
+        
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            InvestigationPlanner._last_error = "GEMINI_API_KEY not found in .env file"
             return None
         
         try:
             llm = ChatGoogleGenerativeAI(
                 model="gemini-2.0-flash",
-                google_api_key=os.getenv("GEMINI_API_KEY"),
-                temperature=0.1
+                google_api_key=api_key,
+                temperature=0.1,
+                max_retries=2
             )
             
             system_prompt = f"""You are an expert Android forensics investigator assistant. 
@@ -344,48 +361,53 @@ Available forensic commands:
 
 For ADB shell commands, you can use "adb_shell:<command>" format.
 
-Respond ONLY with a valid JSON object (no markdown, no explanation) in this format:
-{{
-    "plan_title": "Brief title of the investigation",
-    "analysis": "Brief analysis of what the user wants to investigate",
-    "steps": [
-        {{
-            "step_number": 1,
-            "command": "command_name",
-            "description": "What this step will do",
-            "rationale": "Why this is needed for the investigation"
-        }}
-    ],
-    "warnings": ["Any legal or procedural warnings"],
-    "estimated_time": "Estimated completion time"
-}}
+IMPORTANT: You MUST respond with ONLY a valid JSON object. No markdown code blocks. No explanations before or after.
 
-If the request is a simple single command, return null.
-If the request requires multiple data acquisitions or analysis, create a comprehensive plan.
-Focus on forensically sound procedures that maintain chain of custody."""
+JSON format:
+{{"plan_title": "Brief title", "analysis": "What user wants", "steps": [{{"step_number": 1, "command": "command_name", "description": "What this does", "rationale": "Why needed"}}], "warnings": ["Legal warnings"], "estimated_time": "Time estimate"}}
+
+If the request is too simple (single command), respond with just: null
+
+ALWAYS create a multi-step plan for investigation requests. Be comprehensive."""
 
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=f"User request: {user_request}")
+                HumanMessage(content=f"Create an investigation plan for: {user_request}")
             ]
             
             response = llm.invoke(messages)
             content = response.content.strip()
             
-            # Clean up the response
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
+            # Clean up the response - remove markdown if present
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                parts = content.split("```")
+                if len(parts) >= 2:
+                    content = parts[1]
             content = content.strip()
             
             if content.lower() == "null" or not content:
+                InvestigationPlanner._last_error = "AI returned null - request may be too simple"
                 return None
             
             plan = json.loads(content)
-            return plan if plan and "steps" in plan and len(plan["steps"]) > 1 else None
             
+            if plan and "steps" in plan and len(plan.get("steps", [])) >= 1:
+                return plan
+            else:
+                InvestigationPlanner._last_error = "Plan has no steps"
+                return None
+            
+        except json.JSONDecodeError as e:
+            InvestigationPlanner._last_error = f"Failed to parse AI response as JSON: {str(e)}"
+            return None
         except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower():
+                InvestigationPlanner._last_error = "API quota exceeded. Please wait a moment and try again."
+            else:
+                InvestigationPlanner._last_error = f"AI Error: {error_msg[:200]}"
             return None
     
     @staticmethod
@@ -404,7 +426,8 @@ Focus on forensically sound procedures that maintain chain of custody."""
             "battery": "battery",
             "storage": "storage",
             "network": "network",
-            "processes": "processes"
+            "processes": "processes",
+            "images": "images"
         }
         
         if command in command_map:
@@ -416,16 +439,55 @@ Focus on forensically sound procedures that maintain chain of custody."""
             return f"Unknown command: {command}"
 
 
-def search_web_for_guidance(query: str) -> str:
+def search_web_tavily(query: str) -> str:
     """
-    Search for forensic investigation guidance.
-    Uses DuckDuckGo Instant Answer API for privacy.
+    Search for forensic investigation guidance using Tavily API.
+    """
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    
+    if TAVILY_AVAILABLE and tavily_key:
+        try:
+            client = TavilyClient(api_key=tavily_key)
+            response = client.search(
+                query=f"android mobile forensics {query}",
+                search_depth="advanced",
+                max_results=5
+            )
+            
+            results = []
+            results.append("## WEB SEARCH RESULTS\n")
+            
+            for i, result in enumerate(response.get("results", [])[:5], 1):
+                title = result.get("title", "No title")
+                content = result.get("content", "No content")[:300]
+                url = result.get("url", "")
+                
+                results.append(f"### {i}. {title}\n")
+                results.append(f"{content}...\n")
+                if url:
+                    results.append(f"Source: {url}\n")
+                results.append("")
+            
+            if results:
+                return "\n".join(results)
+            else:
+                return "No results found for your query."
+                
+        except Exception as e:
+            return f"Tavily search error: {str(e)}"
+    
+    # Fallback to DuckDuckGo if Tavily not available
+    return search_web_duckduckgo(query)
+
+
+def search_web_duckduckgo(query: str) -> str:
+    """
+    Fallback search using DuckDuckGo Instant Answer API.
     """
     if not WEB_SEARCH_AVAILABLE:
-        return "Web search not available - requests module not installed"
+        return "Web search not available - install requests: pip install requests"
     
     try:
-        # Use DuckDuckGo Instant Answer API
         search_url = "https://api.duckduckgo.com/"
         params = {
             "q": f"android forensics {query}",
@@ -439,13 +501,11 @@ def search_web_for_guidance(query: str) -> str:
         
         results = []
         
-        # Abstract (main answer)
         if data.get("Abstract"):
             results.append(f"**Summary:** {data['Abstract']}")
             if data.get("AbstractURL"):
                 results.append(f"Source: {data['AbstractURL']}")
         
-        # Related topics
         if data.get("RelatedTopics"):
             results.append("\n**Related Information:**")
             for topic in data["RelatedTopics"][:5]:
@@ -455,28 +515,42 @@ def search_web_for_guidance(query: str) -> str:
         if results:
             return "\n".join(results)
         else:
-            return "No specific guidance found. Consider consulting official Android forensics documentation or NIST guidelines."
+            return "No specific guidance found. Consider consulting official Android forensics documentation."
             
     except Exception as e:
         return f"Search error: {str(e)}"
 
 
+def search_web_for_guidance(query: str) -> str:
+    """Main web search function - uses Tavily if available, otherwise DuckDuckGo."""
+    return search_web_tavily(query)
+
+
 def get_ai_response(user_input: str) -> str:
     """Get AI response for general investigation questions."""
-    if not AI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
-        return None
+    if not AI_AVAILABLE:
+        return "AI features require langchain-google-genai. Install with: pip install langchain-google-genai"
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "GEMINI_API_KEY not configured in .env file"
     
     try:
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.0-flash",
-            google_api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=0.3
+            google_api_key=api_key,
+            temperature=0.3,
+            max_retries=2
         )
         
         system_prompt = """You are an expert Android forensics investigator assistant for law enforcement.
 Provide professional, accurate, and legally sound guidance for digital forensic investigations.
 Keep responses concise and actionable. Reference proper forensic procedures and chain of custody requirements.
-Do not include emojis or casual language. Maintain a professional law enforcement tone."""
+Do not include emojis or casual language. Maintain a professional law enforcement tone.
+
+If the user asks about extracting data, mention the available commands:
+- device info, installed apps, logcat, contacts, call log, sms, battery, storage, network, processes, images
+- Direct ADB commands: adb shell [command], adb pull [path]"""
         
         messages = [
             SystemMessage(content=system_prompt),
@@ -486,7 +560,10 @@ Do not include emojis or casual language. Maintain a professional law enforcemen
         response = llm.invoke(messages)
         return response.content
     except Exception as e:
-        return None
+        error_msg = str(e)
+        if "429" in error_msg or "quota" in error_msg.lower():
+            return "API quota exceeded. Please wait a moment and try again, or use direct commands."
+        return f"AI Error: {error_msg[:200]}"
 
 
 def check_device_connection() -> Dict:
@@ -617,10 +694,24 @@ def process_command(user_input: str) -> str:
         add_artifact("processes", procs, "system")
         return f"## RUNNING PROCESSES\n\n```\n{str(procs)[:8000]}\n```"
     
+    # Image extraction
+    if any(k in lower_input for k in ["images", "photos", "pictures", "dcim", "gallery"]):
+        if any(k in lower_input for k in ["pull", "extract", "download", "fetch", "get"]):
+            result = ADBExecutor.pull_images()
+            add_artifact("images", result, "media")
+            if result["success"]:
+                return f"## IMAGES EXTRACTED\n\n**Destination:** `{result['dest_folder']}`\n\n**Pulled:**\n" + "\n".join(f"- {p}" for p in result['pulled'])
+            else:
+                return f"## IMAGE EXTRACTION\n\n**Errors:**\n" + "\n".join(f"- {e}" for e in result['errors'])
+        else:
+            images = ADBExecutor.get_images_list()
+            add_artifact("images_list", images, "media")
+            return f"## DEVICE IMAGES\n\n```\n{images}\n```\n\n**Tip:** Use 'fetch images' or 'extract images' to download them to your computer."
+    
     # Web search for forensic guidance
-    if any(k in lower_input for k in ["search", "how to", "guide", "procedure", "technique"]):
+    if any(k in lower_input for k in ["search", "how to", "guide", "procedure", "technique", "what is", "explain"]):
         search_results = search_web_for_guidance(user_input)
-        return f"## FORENSIC GUIDANCE\n\n{search_results}"
+        return search_results
     
     # Check if this is a complex investigation request that needs planning
     if InvestigationPlanner.is_available():
@@ -652,6 +743,12 @@ def process_command(user_input: str) -> str:
             plan_display += "\n**Use the 'Execute Plan' button in the sidebar to proceed with this investigation, or type a new command to cancel.**"
             
             return plan_display
+        else:
+            # Show error if AI planning failed
+            error = InvestigationPlanner.get_last_error()
+            if error:
+                # Fall through to AI response
+                pass
     
     # Try AI response for general questions
     ai_response = get_ai_response(user_input)
@@ -684,6 +781,7 @@ def format_packages(packages: List[Dict]) -> str:
 def get_help_message() -> str:
     """Return help message."""
     ai_status = "ACTIVE" if InvestigationPlanner.is_available() else "INACTIVE"
+    tavily_status = "ACTIVE" if TAVILY_AVAILABLE and os.getenv("TAVILY_API_KEY") else "INACTIVE"
     
     return f"""## COMMAND REFERENCE
 
@@ -700,6 +798,8 @@ def get_help_message() -> str:
 | storage | Storage partition information |
 | network | Network configuration |
 | processes | Active process list |
+| images | List images on device |
+| fetch images | Extract all images to computer |
 
 ### Direct ADB Commands
 | Command | Description |
@@ -711,14 +811,16 @@ def get_help_message() -> str:
 | Feature | Description |
 |---------|-------------|
 | Complex Investigation | Describe what you want to investigate and AI will create a step-by-step plan |
-| Search Guidance | Ask "how to" questions for forensic procedure guidance |
+| Web Search (Tavily: {tavily_status}) | Ask "how to", "what is", or "search" questions for guidance |
 | Evidence Analysis | Ask questions about findings for AI-powered analysis |
 
-### Example Complex Requests
+### Example Investigation Requests
 - "Investigate this device for evidence of financial fraud"
 - "Collect all communication data for timeline analysis"
 - "Perform a complete device triage for drug trafficking investigation"
 - "Extract and analyze all user activity from the past 30 days"
+- "Fetch the images from this device"
+- "How to extract deleted messages from Android"
 
 **Note:** Complex investigation requests will generate a plan for your approval before execution.
 """
