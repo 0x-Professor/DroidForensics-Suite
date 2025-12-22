@@ -72,19 +72,26 @@ dev = [
 ]
 
 [project.scripts]
-android-forensics = "forensic_agent.main:main"
-mcp-device-manager = "mcp_servers.device_manager:main"
-mcp-data-acquisition = "mcp_servers.data_acquisition:main"
-mcp-artifact-parser = "mcp_servers.artifact_parser:main"
-mcp-app-analyzer = "mcp_servers.app_analyzer:main"
-mcp-network-forensics = "mcp_servers.network_forensics:main"
-mcp-media-analyzer = "mcp_servers.media_analyzer:main"
-mcp-privilege-escalation = "mcp_servers.privilege_escalation:main"
-mcp-report-generator = "mcp_servers.report_generator:main"
+fia-forensics = "agents.forensic_agent:main"
+mcp-device-manager = "mcp_servers.device_manager:mcp.run"
+mcp-data-acquisition = "mcp_servers.data_acquisition:mcp.run"
+mcp-artifact-parser = "mcp_servers.artifact_parser:mcp.run"
+mcp-app-analyzer = "mcp_servers.app_analyzer:mcp.run"
+mcp-system-forensics = "mcp_servers.system_forensics:mcp.run"
+mcp-report-generator = "mcp_servers.report_generator:mcp.run"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mcp_servers", "forensic_agent"]
+packages = ["mcp_servers", "agents"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/mcp_servers",
+    "/agents",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml"
+]
