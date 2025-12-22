@@ -641,7 +641,9 @@ def launch_ui(share: bool = False, port: int = 7860):
         share=share,
         server_port=port,
         show_error=True,
-        inbrowser=True
+        inbrowser=True,
+        theme=UI_THEME,
+        css=UI_CSS
     )
 
 
