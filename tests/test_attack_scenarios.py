@@ -119,18 +119,31 @@ class TestAntiForensicsTechniques(unittest.TestCase):
             f.write(os.urandom(1000))
             encrypted_db = f.name
         
+        is_encrypted = False
+        conn = None
         try:
-            # Try to open - should fail
-            try:
-                conn = sqlite3.connect(encrypted_db)
-                conn.execute("SELECT * FROM sqlite_master")
-                is_encrypted = False
-            except sqlite3.DatabaseError:
-                is_encrypted = True
-            
-            self.assertTrue(is_encrypted)
+            # Try to open - should fail when querying
+            conn = sqlite3.connect(encrypted_db)
+            conn.execute("SELECT * FROM sqlite_master")
+            is_encrypted = False
+        except sqlite3.DatabaseError:
+            is_encrypted = True
         finally:
-            os.unlink(encrypted_db)
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            # Small delay to ensure file handle is released on Windows
+            import gc
+            gc.collect()
+            time.sleep(0.1)
+            try:
+                os.unlink(encrypted_db)
+            except PermissionError:
+                pass  # May fail on Windows, ignore
+        
+        self.assertTrue(is_encrypted)
 
 
 class TestMalwareArtifacts(unittest.TestCase):
