@@ -234,6 +234,66 @@ class ADBExecutor:
             "local_path": local_path if result.returncode == 0 else None,
             "message": result.stdout + result.stderr
         }
+    
+    @staticmethod
+    def get_images_list() -> str:
+        """List images on the device."""
+        # Search common image locations
+        locations = [
+            "/sdcard/DCIM/",
+            "/sdcard/Pictures/",
+            "/sdcard/Download/",
+            "/storage/emulated/0/DCIM/",
+            "/storage/emulated/0/Pictures/"
+        ]
+        
+        all_images = []
+        for loc in locations:
+            result = ADBExecutor.run_command(
+                f'adb shell find {loc} -type f \\( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.webp" \\) 2>/dev/null',
+                timeout=30
+            )
+            if result["success"] and result.get("stdout"):
+                images = [f.strip() for f in result["stdout"].strip().split("\n") if f.strip()]
+                all_images.extend(images)
+        
+        if all_images:
+            return f"Found {len(all_images)} images:\n" + "\n".join(all_images[:100])
+        return "No images found or permission denied"
+    
+    @staticmethod
+    def pull_images(dest_folder: str = None) -> Dict[str, Any]:
+        """Pull images from device to local folder."""
+        if not dest_folder:
+            dest_folder = str(OUTPUT_DIR / "images" / datetime.now().strftime("%Y%m%d_%H%M%S"))
+        
+        Path(dest_folder).mkdir(parents=True, exist_ok=True)
+        
+        # Get list of images
+        locations = ["/sdcard/DCIM/", "/sdcard/Pictures/"]
+        pulled = []
+        errors = []
+        
+        for loc in locations:
+            result = subprocess.run(
+                [ADB_PATH, "pull", loc, dest_folder],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=Path(__file__).parent.parent
+            )
+            if result.returncode == 0:
+                pulled.append(f"Pulled {loc}")
+            else:
+                errors.append(f"Failed {loc}: {result.stderr[:100]}")
+        
+        return {
+            "success": len(pulled) > 0,
+            "dest_folder": dest_folder,
+            "pulled": pulled,
+            "errors": errors,
+            "message": f"Pulled from {len(pulled)} locations to {dest_folder}"
+        }
 
 
 # ========== AI INVESTIGATION PLANNER ==========
