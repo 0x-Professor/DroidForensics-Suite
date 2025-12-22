@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+adb.exe
+AdbWinApi.dll
+AdbWinUsbApi.dll
+etc1tool.exe
+fastboot.exe
+NOTE.txt
+/pinky
+/output
+/test
+/forensic_backup_20241028.ab

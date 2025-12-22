@@ -1,0 +1,90 @@
+[project]
+name = "android-forensics-framework"
+version = "1.0.0"
+description = "Comprehensive Android Forensics Framework for FIA - Federal Investigation Agency. Multi-agent architecture using LangGraph with MCP servers for complete digital forensics."
+readme = "README.md"
+requires-python = ">=3.13"
+keywords = ["android", "forensics", "digital-forensics", "FIA", "investigation", "mobile-forensics", "langgraph", "mcp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Legal Industry",
+    "Topic :: Security",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    # MCP Server Framework
+    "mcp[cli]>=1.19.0",
+    
+    # LangGraph and LangChain
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "langchain-google-genai>=2.0.0",
+    
+    # Google Gemini AI
+    "google-generativeai>=0.8.0",
+    
+    # Cryptography and Security
+    "cryptography>=43.0.0",
+    
+    # Data Processing
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    
+    # Database parsing
+    "sqlite-utils>=3.35.0",
+    
+    # Image/Media processing
+    "pillow>=10.0.0",
+    "exifread>=3.0.0",
+    
+    # XML/JSON parsing
+    "lxml>=5.0.0",
+    "xmltodict>=0.13.0",
+    
+    # Archive handling
+    "py7zr>=0.20.0",
+    "rarfile>=4.1",
+    
+    # Network analysis
+    "scapy>=2.5.0",
+    
+    # Report generation
+    "jinja2>=3.1.0",
+    "markdown>=3.5.0",
+    
+    # Progress and CLI
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+    
+    # Async support
+    "aiofiles>=23.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+]
+
+[project.scripts]
+android-forensics = "forensic_agent.main:main"
+mcp-device-manager = "mcp_servers.device_manager:main"
+mcp-data-acquisition = "mcp_servers.data_acquisition:main"
+mcp-artifact-parser = "mcp_servers.artifact_parser:main"
+mcp-app-analyzer = "mcp_servers.app_analyzer:main"
+mcp-network-forensics = "mcp_servers.network_forensics:main"
+mcp-media-analyzer = "mcp_servers.media_analyzer:main"
+mcp-privilege-escalation = "mcp_servers.privilege_escalation:main"
+mcp-report-generator = "mcp_servers.report_generator:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_servers", "forensic_agent"]
