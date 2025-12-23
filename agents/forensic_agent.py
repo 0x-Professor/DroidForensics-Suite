@@ -5,7 +5,7 @@ Federal Investigation Agency (FIA) - Android Forensics Framework
 This agent orchestrates the forensic investigation workflow using:
 - LangGraph for agent state management and workflow
 - MCP Adapter to load tools from MCP servers
-- Google Gemini as the LLM backbone
+- xAI Grok as the LLM backbone (OpenAI-compatible)
 """
 
 import asyncio
@@ -17,7 +17,7 @@ from typing import Annotated, Any, Literal, Optional, TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -25,12 +25,14 @@ from langgraph.prebuilt import ToolNode, tools_condition
 # Load environment variables
 load_dotenv()
 
-# Verify API key is set
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in environment. Please set it in .env file.")
+# xAI Grok API Configuration
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-latest")
+XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+if not XAI_API_KEY:
+    raise ValueError("XAI_API_KEY not found in environment. Please set it in .env file.")
+
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./output"))
 
 
