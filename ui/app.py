@@ -1029,7 +1029,7 @@ def create_interface():
                         DIGITAL FORENSICS INVESTIGATION CONSOLE
                     </h1>
                     <p style="color: rgba(255,255,255,0.85); font-size: 0.9rem; margin: 4px 0 0;">
-                        Federal Investigation Agency | Mobile Device Evidence Acquisition System
+                        Mobile Device Evidence Acquisition System
                     </p>
                 </div>
                 <div style="background: #c53030; color: white; padding: 8px 20px; font-size: 0.75rem; font-weight: 600; letter-spacing: 1.5px;">

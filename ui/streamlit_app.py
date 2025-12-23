@@ -1314,7 +1314,7 @@ def main():
     <div class="main-header">
         <span class="classification-badge">OFFICIAL USE ONLY</span>
         <h1>DIGITAL FORENSICS INVESTIGATION CONSOLE</h1>
-        <p>Federal Investigation Agency | Mobile Device Evidence Acquisition System</p>
+        <p>Mobile Device Evidence Acquisition System</p>
     </div>
     """, unsafe_allow_html=True)
     
