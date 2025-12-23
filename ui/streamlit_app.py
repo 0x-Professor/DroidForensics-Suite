@@ -378,7 +378,7 @@ Common ADB commands for forensic data extraction:
         ForensicAgent._last_error = None
         
         if not ForensicAgent.is_available():
-            return {"action": "error", "message": "AI not available. Set GEMINI_API_KEY in .env"}
+            return {"action": "error", "message": "AI not available. Set XAI_API_KEY in .env"}
         
         try:
             llm = ForensicAgent._get_llm()
@@ -620,7 +620,7 @@ Format your response with clear sections. Do not use emojis."""),
 **Available Data:**
 {chr(10).join(f"- **{name}**: {data.get('type', 'unknown')} (collected: {data.get('collected_at', 'unknown')})" for name, data in relevant_data.items())}
 
-*AI analysis unavailable. Configure GEMINI_API_KEY for intelligent insights.*"""
+*AI analysis unavailable. Configure XAI_API_KEY for intelligent insights.*"""
     
     @staticmethod
     def create_and_display_plan(plan_data: Dict) -> str:
@@ -897,8 +897,8 @@ def process_command(user_input: str) -> str:
         return f"""## AI AGENT UNAVAILABLE
 
 The intelligent agent requires configuration. Please ensure:
-1. **GEMINI_API_KEY** is set in your `.env` file
-2. Install: `pip install langchain-google-genai`
+1. **XAI_API_KEY** is set in your `.env` file
+2. Install: `pip install langchain-openai`
 
 **Available Quick Commands (no AI required):**
 - `device info` - Device identification
@@ -1477,7 +1477,7 @@ def main():
             st.text("Ask me anything about\nforensic data extraction\nor artifact analysis")
         else:
             st.markdown('<span style="color: #c53030; font-weight: bold;">AI: INACTIVE</span>', unsafe_allow_html=True)
-            st.text("Set GEMINI_API_KEY in .env\nto enable AI features")
+            st.text("Set XAI_API_KEY in .env\nto enable AI features")
     
     # Main content area
     col1, col2 = st.columns([2, 1])
