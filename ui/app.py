@@ -311,20 +311,21 @@ class ForensicSession:
     
     def init_llm(self) -> bool:
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
+            from langchain_openai import ChatOpenAI
             
-            api_key = os.getenv("GEMINI_API_KEY")
+            api_key = os.getenv("XAI_API_KEY")
             if not api_key:
-                self.log("GEMINI_API_KEY not configured", "WARNING")
+                self.log("XAI_API_KEY not configured", "WARNING")
                 return False
             
-            self.llm = ChatGoogleGenerativeAI(
-                model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-                google_api_key=api_key,
+            self.llm = ChatOpenAI(
+                model=os.getenv("XAI_MODEL", "grok-4-latest"),
+                api_key=api_key,
+                base_url=os.getenv("XAI_BASE_URL", "https://api.x.ai/v1"),
                 temperature=0.1,
             )
             self.llm_available = True
-            self.log("AI Assistant initialized", "INFO", "LLM_INIT")
+            self.log("AI Assistant initialized (xAI Grok)", "INFO", "LLM_INIT")
             return True
         except Exception as e:
             self.log(f"AI initialization failed: {e}", "WARNING")

@@ -20,7 +20,7 @@ from typing import Annotated, Any, Callable, Literal, Optional, Sequence, TypedD
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool, StructuredTool, tool
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
@@ -29,9 +29,10 @@ from langgraph.types import Command, interrupt
 
 load_dotenv()
 
-# Configuration
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+# Configuration - xAI Grok API
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-latest")
+XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./output"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -328,17 +329,18 @@ class DeepForensicAgent:
     """
     
     def __init__(self, model: str = None, checkpointer = None):
-        self.model_name = model or GEMINI_MODEL
+        self.model_name = model or XAI_MODEL
         self.checkpointer = checkpointer or MemorySaver()
         self.tools = self._build_tools()
         self.llm = self._create_llm()
         self.graph = self._build_graph()
     
     def _create_llm(self):
-        """Create the LLM instance."""
-        llm = ChatGoogleGenerativeAI(
+        """Create the LLM instance using xAI Grok."""
+        llm = ChatOpenAI(
             model=self.model_name,
-            google_api_key=GEMINI_API_KEY,
+            api_key=XAI_API_KEY,
+            base_url=XAI_BASE_URL,
             temperature=0.1,
             max_tokens=8192,
         )

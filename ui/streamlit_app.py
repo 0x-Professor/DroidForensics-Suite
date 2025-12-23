@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 # Import LangChain for AI features
 try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_openai import ChatOpenAI
     from langchain_core.messages import HumanMessage, SystemMessage
     AI_AVAILABLE = True
 except ImportError:
@@ -352,7 +352,7 @@ Common ADB commands for forensic data extraction:
     @staticmethod
     def is_available() -> bool:
         """Check if AI agent is available."""
-        return AI_AVAILABLE and bool(os.getenv("GEMINI_API_KEY"))
+        return AI_AVAILABLE and bool(os.getenv("XAI_API_KEY"))
     
     @staticmethod
     def get_last_error() -> Optional[str]:
@@ -360,10 +360,11 @@ Common ADB commands for forensic data extraction:
     
     @staticmethod
     def _get_llm():
-        """Get configured LLM instance."""
-        return ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
-            google_api_key=os.getenv("GEMINI_API_KEY"),
+        """Get configured LLM instance using xAI Grok."""
+        return ChatOpenAI(
+            model=os.getenv("XAI_MODEL", "grok-4-latest"),
+            api_key=os.getenv("XAI_API_KEY"),
+            base_url=os.getenv("XAI_BASE_URL", "https://api.x.ai/v1"),
             temperature=0.2,
             max_retries=2
         )
