@@ -313,19 +313,19 @@ class ForensicSession:
         try:
             from langchain_openai import ChatOpenAI
             
-            api_key = os.getenv("XAI_API_KEY")
+            api_key = os.getenv("GROQ_API_KEY")
             if not api_key:
-                self.log("XAI_API_KEY not configured", "WARNING")
+                self.log("GROQ_API_KEY not configured", "WARNING")
                 return False
             
             self.llm = ChatOpenAI(
-                model=os.getenv("XAI_MODEL", "grok-4-latest"),
+                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
                 api_key=api_key,
-                base_url=os.getenv("XAI_BASE_URL", "https://api.x.ai/v1"),
+                base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
                 temperature=0.1,
             )
             self.llm_available = True
-            self.log("AI Assistant initialized (xAI Grok)", "INFO", "LLM_INIT")
+            self.log("AI Assistant initialized (Groq)", "INFO", "LLM_INIT")
             return True
         except Exception as e:
             self.log(f"AI initialization failed: {e}", "WARNING")

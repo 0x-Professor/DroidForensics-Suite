@@ -30,10 +30,10 @@ from pydantic import BaseModel, Field
 # Load environment variables
 load_dotenv()
 
-# xAI Grok API Configuration
-XAI_API_KEY = os.getenv("XAI_API_KEY")
-XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-latest")
-XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
+# Groq API Configuration (FREE & FAST)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./output"))
 
 
@@ -436,11 +436,11 @@ FORENSIC_TOOLS = [
 def create_interactive_agent():
     """Create the LangGraph agent with human-in-the-loop."""
     
-    # Initialize LLM with xAI Grok (OpenAI-compatible)
+    # Initialize LLM with Groq (OpenAI-compatible)
     llm = ChatOpenAI(
-        model=XAI_MODEL,
-        api_key=XAI_API_KEY,
-        base_url=XAI_BASE_URL,
+        model=GROQ_MODEL,
+        api_key=GROQ_API_KEY,
+        base_url=GROQ_BASE_URL,
         temperature=0.1,
         max_tokens=8192,
     )

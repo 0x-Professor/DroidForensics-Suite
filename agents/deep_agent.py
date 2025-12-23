@@ -29,10 +29,10 @@ from langgraph.types import Command, interrupt
 
 load_dotenv()
 
-# Configuration - xAI Grok API
-XAI_API_KEY = os.getenv("XAI_API_KEY")
-XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-latest")
-XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
+# Configuration - Groq API (FREE & FAST)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./output"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -329,18 +329,18 @@ class DeepForensicAgent:
     """
     
     def __init__(self, model: str = None, checkpointer = None):
-        self.model_name = model or XAI_MODEL
+        self.model_name = model or GROQ_MODEL
         self.checkpointer = checkpointer or MemorySaver()
         self.tools = self._build_tools()
         self.llm = self._create_llm()
         self.graph = self._build_graph()
     
     def _create_llm(self):
-        """Create the LLM instance using xAI Grok."""
+        """Create the LLM instance using Groq."""
         llm = ChatOpenAI(
             model=self.model_name,
-            api_key=XAI_API_KEY,
-            base_url=XAI_BASE_URL,
+            api_key=GROQ_API_KEY,
+            base_url=GROQ_BASE_URL,
             temperature=0.1,
             max_tokens=8192,
         )

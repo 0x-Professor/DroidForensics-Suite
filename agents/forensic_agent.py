@@ -25,13 +25,13 @@ from langgraph.prebuilt import ToolNode, tools_condition
 # Load environment variables
 load_dotenv()
 
-# xAI Grok API Configuration
-XAI_API_KEY = os.getenv("XAI_API_KEY")
-XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-latest")
-XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
+# Groq API Configuration (FREE & FAST)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
-if not XAI_API_KEY:
-    raise ValueError("XAI_API_KEY not found in environment. Please set it in .env file.")
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY not found in environment. Please set it in .env file.")
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./output"))
 
@@ -141,11 +141,11 @@ async def load_mcp_tools():
 
 
 def create_llm(tools: list = None):
-    """Create the xAI Grok LLM with optional tool binding."""
+    """Create the Groq LLM with optional tool binding."""
     llm = ChatOpenAI(
-        model=XAI_MODEL,
-        api_key=XAI_API_KEY,
-        base_url=XAI_BASE_URL,
+        model=GROQ_MODEL,
+        api_key=GROQ_API_KEY,
+        base_url=GROQ_BASE_URL,
         temperature=0.1,  # Low temperature for consistent forensic analysis
         max_tokens=8192,
     )
