@@ -141,10 +141,11 @@ async def load_mcp_tools():
 
 
 def create_llm(tools: list = None):
-    """Create the Gemini LLM with optional tool binding."""
-    llm = ChatGoogleGenerativeAI(
-        model=GEMINI_MODEL,
-        google_api_key=GEMINI_API_KEY,
+    """Create the xAI Grok LLM with optional tool binding."""
+    llm = ChatOpenAI(
+        model=XAI_MODEL,
+        api_key=XAI_API_KEY,
+        base_url=XAI_BASE_URL,
         temperature=0.1,  # Low temperature for consistent forensic analysis
         max_tokens=8192,
     )
