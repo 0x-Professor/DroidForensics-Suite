@@ -20,7 +20,7 @@ from typing import Annotated, Any, Literal, Optional, TypedDict
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
@@ -30,8 +30,10 @@ from pydantic import BaseModel, Field
 # Load environment variables
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+# xAI Grok API Configuration
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-latest")
+XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./output"))
 
 
@@ -434,10 +436,11 @@ FORENSIC_TOOLS = [
 def create_interactive_agent():
     """Create the LangGraph agent with human-in-the-loop."""
     
-    # Initialize LLM
-    llm = ChatGoogleGenerativeAI(
-        model=GEMINI_MODEL,
-        google_api_key=GEMINI_API_KEY,
+    # Initialize LLM with xAI Grok (OpenAI-compatible)
+    llm = ChatOpenAI(
+        model=XAI_MODEL,
+        api_key=XAI_API_KEY,
+        base_url=XAI_BASE_URL,
         temperature=0.1,
         max_tokens=8192,
     )
